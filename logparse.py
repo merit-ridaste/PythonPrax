@@ -2,25 +2,38 @@
 import gzip
 import os
 import urllib.parse
+import argparse
 
-root = os.path.expanduser("~/Documents/Python/logs/")
+#root = os.path.expanduser("~/Documents/Python/logs/")
+parser= argparse.ArgumentParser(description='Apache2 log parser.')
+parser.add_argument ('--path', 
+    help = "Path to Apache2 log files", default="/var/log/apache2")
+parser.add_argument('--top-urls',
+    help= "Find top URL-s", action='store_true')
+parser.add_argument('--geoip',
+    help = "Resolve IP-s to country codes", action='store_true')
+parser.add_argument('--verbose',
+    help = "Increase verbosity", action="store_true")
+args= parser.parse_args()
 
 keywords = "Windows", "Linux", "OS X", "Ubuntu", "Googlebot", "bingbot", "Android", "YandexBot", "facebookexternalhit"
 d = {}# Curly braces define empty dictionary
-
 urls = {}
 user_bytes={}
+
+
 total = 0
 
-for filename in os.listdir(root):
+for filename in os.listdir(args.path):
     if not filename.startswith("access.log"):
         #print "Skipping unknown file:", filename
         continue
     if filename.endswith(".gz"):
-    	data = gzip.open(os.path.join(root, filename))
-    else: 	
-        data= open(os.path.join(root,filename), "rb")
-    print ("Parsing:", filename)    
+        data = gzip.open(os.path.join(args.path, filename))
+    else:   
+        data= open(os.path.join(args.path,filename), "rb")
+    if args.verbose:
+        print ("Parsing:", filename)    
     for line in data:
         total += 1
         try:
@@ -54,6 +67,19 @@ for filename in os.listdir(root):
                 except KeyError:
                     d[keyword] = 1
                 break
+
+
+def humanize(bytes):
+    if bytes <1024:
+        return "%d B" % bytes
+    elif bytes< 1024**2:
+        return "%d kB" % (bytes/1024)
+    elif bytes <1024**3:
+        return "%d MB" %(bytes/1024**2)
+    else:
+        return "%d GB" %(bytes/1024**3) 
+
+
 
 print()
 print("Top 5 bandwidth hoggers:")
