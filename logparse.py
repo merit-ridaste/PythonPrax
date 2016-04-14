@@ -7,7 +7,6 @@ from maprender import render_map
 from jinja2 import Environment, FileSystemLoader
 import codecs
 from logparserClass import LogParser
-import os
 from threading import Thread
 
 PROJECT_ROOT = os.path.dirname(__file__)
@@ -27,6 +26,7 @@ parser.add_argument('--verbose',
 parser.add_argument('--skip-compressed',
     help="Skip compressed files", action="store_true")
 args= parser.parse_args()
+filenames = []
 
 try:
     gi = GeoIP.open(args.geoip, GeoIP.GEOIP_MEMORY_CACHE)
@@ -34,48 +34,37 @@ except:
     print("Failed to open up GeoIP database, are you sure %s exists?" % args.geoip)
     exit(255)
 
-def run(self):
-        while True:
-            try:
-                filename = filenames.pop() # Try to get a filename from the list
-            except IndexError:
-                break
-            if not filename.lower().endswith("access."):
-                continue
-            print self.getName(), "is processing", filename
-
-        logparser.parse_file(fh)
-
+filenames= [i for i in os.listdir(args.path) if i.startswith("acess.")]
 logparser = LogParser(gi, keywords = ("Windows", "Linux", "OS X"))
 
-#for filename in os.listdir(args.path):
- #   if not filename.startswith("access."):#print "Skipping unknown file:", filename
-  #      continue
+class ParserThread(Thread):
+    def run(self):
+        while True:
+            try:
+                filename = filenames.pop()    
+            except IndexError:
+                break
+                if filename.edswith(".gz"):
+                    if args.skip_copressed:
+                        continue
+                    fh= gzip.open(os.path.join(args.path,filename))
+                else:
+                    fh= open(os.path.join(args.path,filename))
+                if args.verbose:
+                    print "Parsing:", filename
+                logparser.parse_file(fh)                
 
-   # if filename.endswith(".gz"):
-    #    if args.skip_compressed:
-     #       continue
-      #  fh = gzip.open(os.path.join(args.path, filename))
-    #else:   
-     #   fh = open(os.path.join(args.path,filename), "rb")
-    #if args.verbose:
-     #   print("Parsing:", filename)
 
-    #logparser.parse_file(fh)
+threads = [ParserThread() for i in range (0, 4)] 
+for thread in threads:
+    thread.daemon = True
+    thread.start() # Start up the threads
+for thread in threads:
+    thread.join()     
 
 if not logparser.urls:
     print ("No log entries!")
-    exit(254)      
-
-
-threads = []
-for i in range(0, 8):
-    threads.append(ImageConverter())
-for thread in threads:
-    thread.start() # Start up the threads
-for thread in threads:
-    thread.join()
-
+    exit(254)            
 
 def humanize(bytes):
     if bytes <1024:
@@ -104,13 +93,12 @@ context = {
 }
 
 with codecs.open(os.path.join(args.output, "report.html"), "wb", encoding="utf-8") as fh:
-    fh.write(env.get_template("template.html").render(conte))
+    fh.write(env.get_template("template.html").render(context))
 
     # A more convenient way is to use env.get_template("...").render(locals())
     # locals() is a dict which contains all locally defined variables ;)
 
 os.system("x-www-browser file://" + os.path.realpath("build/report.html") + " &")
-
 
 
 
